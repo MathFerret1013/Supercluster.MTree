@@ -40,7 +40,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MRoutingNode.cs" />
+    <Compile Include="Design\InternalNode.cs" />
+    <Compile Include="Design\InternalNodeEntry.cs" />
+    <Compile Include="Design\LeafNode.cs" />
+    <Compile Include="Design\LeafNodeEntry.cs" />
+    <Compile Include="Design\MNodeEntry.cs" />
+    <Compile Include="IIdentifiableNode.cs" />
+    <Compile Include="InternalNode.cs" />
+    <Compile Include="InternalNodeElement.cs" />
+    <Compile Include="LeafNode.cs" />
+    <Compile Include="Design\MNode.cs" />
+    <Compile Include="MTree.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
