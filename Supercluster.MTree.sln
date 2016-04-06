@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Supercluster.MTree", "Supercluster.MTree\Supercluster.MTree.csproj", "{4BE58806-7FF5-4D5B-9E6B-D5DF6419F8C7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Workbench", "Workbench\Workbench.csproj", "{94993BBF-70B9-439C-9CF1-5A89199AD227}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{4BE58806-7FF5-4D5B-9E6B-D5DF6419F8C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4BE58806-7FF5-4D5B-9E6B-D5DF6419F8C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4BE58806-7FF5-4D5B-9E6B-D5DF6419F8C7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94993BBF-70B9-439C-9CF1-5A89199AD227}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94993BBF-70B9-439C-9CF1-5A89199AD227}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94993BBF-70B9-439C-9CF1-5A89199AD227}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94993BBF-70B9-439C-9CF1-5A89199AD227}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

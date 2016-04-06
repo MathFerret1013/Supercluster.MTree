@@ -2,14 +2,13 @@
 {
     public abstract class MNodeEntry<T>
     {
-        public T Value;
+        public T Value { get; set; }
+
+        public double DistanceFromParent { get; set; }
 
         /// <summary>
-        /// Note: This is not the node containing the entry. Is the parent of the node containing this entry.
+        /// THe node which contains this entry.
         /// </summary>
-        public MNode<T, InternalNodeEntry<T>> ParentNode;
-
-        public double DistanceFromParent;
-
+        public MNode<T> ParentNode { get; set; }
     }
 }
