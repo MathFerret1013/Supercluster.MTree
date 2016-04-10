@@ -11,6 +11,16 @@ namespace Supercluster.MTree
 
     using Supercluster.MTree.Design;
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <remarks>
+    /// 
+    /// References:
+    /// [1] P. Ciaccia, M. Patella, and P. Zezula. M-tree: an efficient access method for similarity search in metric spaces. 
+    /// In Proceedings of the 23rd International Conference on Very Large Data Bases (VLDB), pages 426–435, Athens, Greece, August 1997
+    /// </remarks>
+    /// <typeparam name="T"></typeparam>
     public class MTree<T>
     {
         public InternalNode<T> Root = new InternalNode<T>();
@@ -69,59 +79,129 @@ namespace Supercluster.MTree
         }
 
 
-        private void Split(MNode<T> node, T newEntry)
+        private void Split<TNode>(TNode node, T newEntryValue) where TNode : MNode<T>
         {
-
-            if (this.Root != node)
+            if (!node.IsInternalNode)
             {
-                var entries = node.Entries.ToList();
+                // add new entry to the entries list
+                var entries = new List<LeafNodeEntry<T>>();
+                entries.AddRange(node.Entries.Select(e => (LeafNodeEntry<T>)e));
+                var newEntry = new LeafNodeEntry<T> { Value = newEntryValue };
+                entries.Add(newEntry);
 
-                // if internal node
-                // entries.Add();
+                //if we are not the root, the get the parent of the current node.
+                MNodeEntry<T> parentEntry;
+                MNode<T> parentNode;
+                if (node != this.Root)
+                {
+                    parentEntry = node.ParentEntry;
+                    parentNode = node.ParentEntry.ParentNode;
+                }
 
 
+                var newNode = new InternalNode<T>();
+                var promotionIndexes = this.Promote(entries.ToArray()); // TODO: Does not need to be an array
+                var promotionObjects = entries.SubsetByIndex(promotionIndexes);
+                var partition1 = new List<LeafNodeEntry<T>>();
+                var partition2 = new List<LeafNodeEntry<T>>();
+                BalancedPartitioning(entries, promotionObjects[0], promotionObjects[1], partition1, partition2);
 
+                node.Entries = partition1;
+                newNode.Entries = new List<InternalNodeEntry<T>>();
 
-                var parentEntry = node.ParentEntry;
-                var parentNode = node.ParentEntry.ParentNode;
             }
+
+
+
+
+
         }
 
 
-        // Chooses two nodes according to the mM_RAD split policy with balanced partitions.
-        public Tuple<int, int> Promote<TNodeEntry>(TNodeEntry[] entries, bool isSplitNodeLeaf) where TNodeEntry : MNodeEntry<T>
+        /// <summary>
+        /// Chooses two <see cref="MNodeEntry{T}"/>s to be promoted up the tree. The two nodes are chosen 
+        /// according to the mM_RAD split policy with balanced partitions defined in reference [1] pg. 431.
+        /// </summary>
+        /// <typeparam name="TNodeEntry">The type pf the node entry.</typeparam>
+        /// <param name="entries">The entries for which two node will be choose from.</param>
+        /// <param name="isSplitNodeLeaf"></param>
+        /// <returns>The indexes of the element pairs which are the two objects to promote</returns>
+        public int[] Promote<TNodeEntry>(TNodeEntry[] entries) where TNodeEntry : MNodeEntry<T>
         {
+            // Note: We calculate all possible unique pair-wise distance between the points to avoid
+            // and further distance calculations.
             // There is a one-to-one correspondence between uniquePairs and uniqueDistances
-            var uniquePairs = Utilities.UniquePairs(entries.Length);
-            var uniqueDistances = uniquePairs.Select(p => this.Metric(entries[p.Item1].Value, entries[p.Item2].Value)).ToArray();
+            var uniquePairs = Utilities.UniquePairs(entries.Length); // we only store the indexes of the pairs
+            var uniqueDistances = uniquePairs.Select(p => this.Metric(entries[p.Item1].Value, entries[p.Item2].Value)).Reverse().ToArray();
 
-
+            // The pair which has the current minimum maximum radius
             var minPair = new Tuple<int, int>(-1, -1);
             var minMaxRadius = double.MaxValue;
 
+            // We iterate through each pair performing a balanced partition
+            // of the remaining points.
             foreach (var pair in uniquePairs)
             {
-                var pointsNotInPair = Enumerable.Range(1, entries.Length).Except(new[] { pair.Item1, pair.Item2 }).ToList();//TODO: Optimize
+                // Get the indexes of the points not in the current pair
+                var pointsNotInPair = Enumerable.Range(0, entries.Length - 1).Except(new[] { pair.Item1, pair.Item2 }).ToList();//TODO: Optimize
                 var firstPartDist = double.MinValue;
                 var secondPartDist = double.MinValue;
 
                 int k = 0;
+                var len = entries.Length - 1;
                 while (pointsNotInPair.Count > 0)
                 {
+                    int minIndex = -1;
                     if (k % 2 == 0)
                     {
-                        // TODO: We are computing these distance instead of looking them up. Optimize!
-                        var dist = pointsNotInPair.Select(p => this.Metric(entries[p].Value, entries[pair.Item1].Value)).Min();
+                        var dist = double.MaxValue;
+
+                        // Here we calculate the index of the pair in the unique distances array
+                        // this calculation depends on the unique distances array being reversed
+                        for (int i = 0; i < pointsNotInPair.Count; i++)
+                        {
+                            var max = Math.Max(pointsNotInPair[i], pair.Item1);
+                            var min = Math.Min(pointsNotInPair[i], pair.Item1);
+                            var x = len - min;
+                            var index = (x * (x + 1) / 2) - (max - min);
+
+                            if (uniqueDistances[index] < dist)
+                            {
+                                dist = uniqueDistances[index];
+                                minIndex = i;
+                            }
+                        }
+
+
+                        // var dist = pointsNotInPair.Select(p => this.Metric(entries[p].Value, entries[pair.Item1].Value)).Min();
                         firstPartDist = Math.Max(firstPartDist, dist);
                     }
                     else
                     {
-                        // TODO: We are computing these distance instead of looking them up. Optimize!
-                        var dist = pointsNotInPair.Select(p => this.Metric(entries[p].Value, entries[pair.Item2].Value)).Min();
+                        var dist = double.MaxValue;
+
+                        // Here we calculate the index of the pair in the unique distances array
+                        // this calculation depends on the unique distances array being reversed
+                        for (int i = 0; i < pointsNotInPair.Count; i++)
+                        {
+                            var max = Math.Max(pointsNotInPair[i], pair.Item1);
+                            var min = Math.Min(pointsNotInPair[i], pair.Item1);
+                            var x = len - min;
+                            var index = (x * (x + 1) / 2) - (max - min);
+
+                            if (uniqueDistances[index] < dist)
+                            {
+                                dist = uniqueDistances[index];
+                                minIndex = i;
+                            }
+                        }
+
+                        //var dist = pointsNotInPair.Select(p => this.Metric(entries[p].Value, entries[pair.Item2].Value)).Min();
                         secondPartDist = Math.Max(secondPartDist, dist);
                     }
 
-                    pointsNotInPair.RemoveAt(pointsNotInPair.Count); ;
+                    pointsNotInPair.RemoveAt(minIndex);
+                    k++;
                 }
 
                 var localMinMaxRadius = Math.Max(firstPartDist, secondPartDist);
@@ -133,18 +213,21 @@ namespace Supercluster.MTree
 
             }
 
-            return minPair;
+            // TODO: This method is called from the split method. In the split method we call both promote an partition in one method
+
+            return new int[] { minPair.Item1, minPair.Item2 };
 
         }
 
-        private void BalancedPartitioning(
-            IList<MNodeEntry<T>> entries,
-            MNodeEntry<T> object1,
-            MNodeEntry<T> object2,
-            List<MNodeEntry<T>> partition1, // may need to be ref
-            List<MNodeEntry<T>> partition2) // may need to be ref
+        private void BalancedPartitioning<TNodeEntry>(
+            IList<TNodeEntry> entries,
+            TNodeEntry object1,
+            TNodeEntry object2,
+            List<TNodeEntry> partition1,
+            List<TNodeEntry> partition2) where TNodeEntry : MNodeEntry<T>
         {
-            // TODO: Optimize this code
+            // TODO: This method is called from the split method. In the split method we call both promote an partition in one method
+            // TOD): Get rid of this method
             while (entries.Count > 0)
             {
                 var firstNearestIndex = entries.Select(e => this.Metric(e.Value, object1.Value)).MinIndex();
