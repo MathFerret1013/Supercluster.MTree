@@ -40,13 +40,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Design\InternalNode.cs" />
-    <Compile Include="Design\InternalNodeEntry.cs" />
-    <Compile Include="Design\LeafNode.cs" />
-    <Compile Include="Design\LeafNodeEntry.cs" />
-    <Compile Include="Design\MNodeEntry.cs" />
-    <Compile Include="Design\MNode.cs" />
     <Compile Include="MTree.cs" />
+    <Compile Include="NewDesign\DistanceMatrix.cs" />
+    <Compile Include="NewDesign\MNode.cs" />
+    <Compile Include="NewDesign\MNodeEntry.cs" />
+    <Compile Include="NewDesign\PromotionResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Utilities.cs" />
   </ItemGroup>

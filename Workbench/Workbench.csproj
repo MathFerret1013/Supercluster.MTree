@@ -50,6 +50,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Supercluster.MTree.Tests\Supercluster.MTree.Tests.csproj">
+      <Project>{0B518ED8-504A-4939-A9B7-D7FD04BA98A1}</Project>
+      <Name>Supercluster.MTree.Tests</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Supercluster.MTree\Supercluster.MTree.csproj">
       <Project>{4BE58806-7FF5-4D5B-9E6B-D5DF6419F8C7}</Project>
       <Name>Supercluster.MTree</Name>
