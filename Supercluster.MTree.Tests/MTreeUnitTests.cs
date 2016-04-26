@@ -1,7 +1,6 @@
-﻿using System;
-
-namespace Supercluster.MTree.Tests
+﻿namespace Supercluster.MTree.Tests
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
 
@@ -30,7 +29,7 @@ namespace Supercluster.MTree.Tests
                       new double[] { 9.75, 9.75 }
                   };
 
-            var mtree = new MTree<double[]> { Capacity = 3, Metric = Norms.L2Norm_Squared_Double };
+            var mtree = new MTree<double[]> { Capacity = 3, Metric = Metrics.L2Norm_Double };
             foreach (var point in points)
             {
                 mtree.Add(point);
@@ -131,7 +130,7 @@ namespace Supercluster.MTree.Tests
                 3. Ensure all Distance from parents are correct
                 Root entries have a distance from parent of -1, so they are not checked here
             */
-            var distanceMatrix = new DistanceMatrix<double[]>(points, Norms.L2Norm_Squared_Double);
+            var distanceMatrix = new DistanceMatrix<double[]>(points, Metrics.L2Norm_Double);
             Assert.That(middleEntries[0].DistanceFromParent, Is.EqualTo(distanceMatrix[0, 0]));
             Assert.That(middleEntries[1].DistanceFromParent, Is.EqualTo(distanceMatrix[0, 2]));
             Assert.That(middleEntries[2].DistanceFromParent, Is.EqualTo(distanceMatrix[3, 3]));
@@ -164,14 +163,57 @@ namespace Supercluster.MTree.Tests
                                  new double[] { Math.PI, Math.E }
                              };
 
-            var distMatrix = new DistanceMatrix<double[]>(points, Norms.L2Norm_Squared_Double);
+            var distMatrix = new DistanceMatrix<double[]>(points, Metrics.L2Norm_Double);
 
             for (int i = 0; i < points.Length; i++)
             {
                 for (int j = 0; j < points.Length; j++)
                 {
-                    Assert.That(Norms.L2Norm_Squared_Double(points[i], points[j]), Is.EqualTo(distMatrix[i, j]));
+                    Assert.That(Metrics.L2Norm_Double(points[i], points[j]), Is.EqualTo(distMatrix[i, j]));
                 }
+            }
+        }
+
+        [Test]
+        public void RadialSearchTest()
+        {
+            var dataSize = 100000;
+            var testDataSize = 1;
+            var range = 1000;
+            var radius = 50;
+
+            var treeData = Utilities.GenerateDoubles(dataSize, range);
+            var testData = Utilities.GenerateDoubles(testDataSize, range);
+            var tree = new MTree<double[]>();
+            tree.Metric = Metrics.L2Norm_Double;
+
+            // build tree
+            foreach (var point in treeData)
+            {
+                tree.Add(point);
+            }
+
+            // perform searches
+            var resultsList = new List<double[]>();
+            tree.RangeSearch(tree.Root, testData[0], radius, resultsList);
+
+            var linearResults = new List<double[]>();
+            foreach (var point in treeData)
+            {
+                if (Metrics.L2Norm_Double(point, testData[0]) <= radius)
+                {
+                    linearResults.Add(point);
+                }
+            }
+
+            // sort results
+            var sortedTreeResults = resultsList.OrderBy(r => r[0]).ThenBy(r => r[1]).ToArray();
+            var sortedLinearResults = linearResults.OrderBy(r => r[0]).ThenBy(r => r[1]).ToArray();
+
+            Assert.That(sortedTreeResults.Length == sortedLinearResults.Length);
+            for (int i = 0; i < sortedLinearResults.Length; i++)
+            {
+                Assert.That(sortedLinearResults[i].SequenceEqual(sortedTreeResults[i]));
             }
         }
     }

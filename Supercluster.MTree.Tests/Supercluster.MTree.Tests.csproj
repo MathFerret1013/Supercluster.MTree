@@ -54,9 +54,10 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
-    <Compile Include="Norms.cs" />
+    <Compile Include="Metrics.cs" />
     <Compile Include="MTreeUnitTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utilities.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

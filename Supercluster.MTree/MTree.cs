@@ -26,6 +26,7 @@ namespace Supercluster.MTree
         }
 
         public int Capacity = 3;
+
         public MNode<T> Root;
 
 
@@ -54,7 +55,8 @@ namespace Supercluster.MTree
 
                 // these are the balls in which our newEntry already resides in
                 // TODO: Don't double compute the distances
-                var entries_in = entries.Where(n => this.Metric(n.Value, newNodeEntry.Value) <= n.CoveringRadius).ToArray();
+                var entries_in =
+                    entries.Where(n => this.Metric(n.Value, newNodeEntry.Value) <= n.CoveringRadius).ToArray();
                 MNodeEntry<T> closestEntry;
                 if (entries_in.Length > 0) // new entry is currently in the region of a ball
                 {
@@ -66,8 +68,9 @@ namespace Supercluster.MTree
                 {
                     // since we are not in any of the balls we find which ball we are closest to and extend that ball
                     // we choose the ball whose radius we must increase the least
-                    var elementDistances = entries_in.Select(e => this.Metric(e.Value, newNodeEntry.Value) - e.CoveringRadius).ToList();
-                    closestEntry = entries_in[elementDistances.IndexOf(elementDistances.Min())];
+                    var elementDistances =
+                        entries.Select(e => this.Metric(e.Value, newNodeEntry.Value) - e.CoveringRadius).ToList();
+                    closestEntry = entries[elementDistances.IndexOf(elementDistances.Min())];
                     closestEntry.CoveringRadius = this.Metric(closestEntry.Value, newNodeEntry.Value);
                 }
 
@@ -100,72 +103,77 @@ namespace Supercluster.MTree
 
         private void Split(MNode<T> node, MNodeEntry<T> newEntry)
         {
-            // If we are a root node
-            if (node == this.Root)
+            var nodeIsRoot = node == this.Root;
+            MNode<T> parent = null;
+            var parentEntryIndex = -1;
+
+            if (!nodeIsRoot)
             {
-                // add new entry to the entries list
-                var entries = node.Entries.ToList();
-                entries.Add(newEntry);
+                // keep reference to parent node
+                parent = node.ParentEntry.ParentNode;
+                parentEntryIndex = parent.Entries.IndexOf(node.ParentEntry);
+                //if we are not the root, the get the parent of the current node.
+            }
 
-                var newNode = new MNode<T> { Capacity = this.Capacity };
-                var promotionResult = this.Promote(entries.ToArray(), true); // TODO: Does not need to be an array
+            // Create local copy of entries
+            var entries = node.Entries.ToList();
+            entries.Add(newEntry);
 
-                node.Entries = promotionResult.FirstPartition;
-                newNode.Entries = promotionResult.SecondPartition;
+            var newNode = new MNode<T> { Capacity = this.Capacity };
+            var promotionResult = this.Promote(entries.ToArray(), node.IsInternalNode); // TODO: Does not need to be an array
+            node.Entries = promotionResult.FirstPartition;
+            newNode.Entries = promotionResult.SecondPartition;
 
+            // Set child nodes of promotion objects
+            promotionResult.FirstPromotionObject.ChildNode = node;
+            promotionResult.SecondPromotionObject.ChildNode = newNode;
 
-                // Set child nodes of promotion objects
-                promotionResult.FirstPromotionObject.ChildNode = node;
-                promotionResult.SecondPromotionObject.ChildNode = newNode;
-
-
+            if (nodeIsRoot)
+            {
                 // if we are the root node, then create a new root and assign the promoted objects to them
                 var newRoot = new MNode<T> { ParentEntry = null, Capacity = this.Capacity };
                 newRoot.AddRange(
                     new List<MNodeEntry<T>>
                         {
-                                promotionResult.FirstPromotionObject,
-                                promotionResult.SecondPromotionObject
+                            promotionResult.FirstPromotionObject,
+                            promotionResult.SecondPromotionObject
                         });
 
                 this.Root = newRoot;
             }
             else // we are not the root
             {
-                // keep reference to parent node
-                var parent = node.ParentEntry.ParentNode;
-                var parentEntryIndex = node != this.Root ? parent.Entries.IndexOf(node.ParentEntry) : -1;  //if we are not the root, the get the parent of the current node.
-
-                // add new entry to the entries list
-                var entries = node.Entries.ToList();
-                entries.Add(newEntry);
-
-                var newNode = new MNode<T> { Capacity = this.Capacity };
-                var promotionResult = this.Promote(entries.ToArray(), true); // TODO: Does not need to be an array
-
-                node.Entries = promotionResult.FirstPartition;
-                newNode.Entries = promotionResult.SecondPartition;
-
-
-                // Set child nodes of promotion objects
-                promotionResult.FirstPromotionObject.ChildNode = node;
-                promotionResult.SecondPromotionObject.ChildNode = newNode;
-
+                // Set distance from parent
+                if (parent == this.Root)
+                {
+                    promotionResult.FirstPromotionObject.DistanceFromParent = -1;
+                }
+                else
+                {
+                    promotionResult.FirstPromotionObject.DistanceFromParent = this.Metric(promotionResult.FirstPromotionObject.Value, parent.ParentEntry.Value);
+                }
 
                 parent.SetEntryAtIndex(parentEntryIndex, promotionResult.FirstPromotionObject);
-
-
-                if (node.ParentEntry.ParentNode.IsFull)
+                if (parent.IsFull)
                 {
                     this.Split(parent, promotionResult.SecondPromotionObject);
                 }
                 else
                 {
+                    // Set distance from parent
+                    if (parent == this.Root)
+                    {
+                        promotionResult.SecondPromotionObject.DistanceFromParent = -1;
+                    }
+                    else
+                    {
+                        promotionResult.SecondPromotionObject.DistanceFromParent = this.Metric(promotionResult.SecondPromotionObject.Value, parent.ParentEntry.Value);
+                    }
+
                     parent.Add(promotionResult.SecondPromotionObject);
                 }
+
             }
-
-
         }
 
 
@@ -177,9 +185,9 @@ namespace Supercluster.MTree
         /// according to the mM_RAD split policy with balanced partitions defined in reference [1] pg. 431.
         /// </summary>
         /// <param name="entries">The entries for which two node will be choose from.</param>
-        /// <param name="isLeafNode">Specifies if the <paramref name="entries"/> list parameter come from a leaf node.</param>
+        /// <param name="isInternalNode">Specifies if the <paramref name="entries"/> list parameter comes from an internal node.</param>
         /// <returns>The indexes of the element pairs which are the two objects to promote</returns>
-        public PromotionResult<T> Promote(MNodeEntry<T>[] entries, bool isLeafNode)
+        private PromotionResult<T> Promote(MNodeEntry<T>[] entries, bool isInternalNode)
         {
             var uniquePairs = Utilities.UniquePairs(entries.Length);
             var distanceMatrix = new DistanceMatrix<T>(entries.Select(e => e.Value).ToArray(), this.Metric);
@@ -212,60 +220,14 @@ namespace Supercluster.MTree
             foreach (var pair in uniquePairs)
             {
                 // Get the indexes of the points not in the current pair
-                var pointsNotInPair = Enumerable.Range(0, entries.Length).Except(new[] { pair.Item1, pair.Item2 }).ToList();//TODO: Optimize
+                var pointsNotInPair =
+                    Enumerable.Range(0, entries.Length).Except(new[] { pair.Item1, pair.Item2 }).ToList();
+                //TODO: Optimize
 
-                var localFirstPartition = new List<int> { pair.Item1 };
-                var localSecondPartition = new List<int> { pair.Item2 };
+                var partitions = this.BalancedPartition(pair, pointsNotInPair, distanceMatrix);
+                var localFirstPartition = partitions.Item1;
+                var localSecondPartition = partitions.Item2;
 
-                var firstPromotedObjectCoveringRadius = double.MinValue;
-                var secondPromotedObjectCoveringRadius = double.MinValue;
-
-                int k = 0;
-                while (pointsNotInPair.Count > 0)
-                {
-                    int minIndex = -1;
-                    if (k % 2 == 0)
-                    {
-                        var dist = double.MaxValue;
-
-                        // Here we calculate the index of the pair in the unique distances array
-                        // this calculation depends on the unique distances array being reversed
-                        for (int i = 0; i < pointsNotInPair.Count; i++)
-                        {
-                            if (distanceMatrix[pointsNotInPair[i], pair.Item1] < dist)
-                            {
-                                dist = distanceMatrix[pointsNotInPair[i], pair.Item1];
-                                minIndex = i;
-                            }
-                        }
-
-                        // var dist = pointsNotInPair.Select(p => this.Metric(entries[p].Value, entries[pair.Item1].Value)).Min();
-                        firstPromotedObjectCoveringRadius = Math.Max(firstPromotedObjectCoveringRadius, dist); // this is the covering radius of the would be promoted object
-                        localFirstPartition.Add(pointsNotInPair[minIndex]);
-                    }
-                    else
-                    {
-                        var dist = double.MaxValue;
-
-                        // Here we calculate the index of the pair in the unique distances array
-                        // this calculation depends on the unique distances array being reversed
-                        for (int i = 0; i < pointsNotInPair.Count; i++)
-                        {
-                            if (distanceMatrix[pointsNotInPair[i], pair.Item2] < dist)
-                            {
-                                dist = distanceMatrix[pointsNotInPair[i], pair.Item2];
-                                minIndex = i;
-                            }
-                        }
-
-                        //var dist = pointsNotInPair.Select(p => this.Metric(entries[p].Value, entries[pair.Item2].Value)).Min();
-                        secondPromotedObjectCoveringRadius = Math.Max(secondPromotedObjectCoveringRadius, dist);
-                        localSecondPartition.Add(pointsNotInPair[minIndex]);
-                    }
-
-                    pointsNotInPair.RemoveAt(minIndex);
-                    k++;
-                }
 
                 /*
                     As specified in reference [1] pg. 430. If we are splitting a leaf node,
@@ -277,9 +239,13 @@ namespace Supercluster.MTree
                     of promoted object O_1 with partition P_1 is
 
                     coveringRadius_O_1 = max{ distance(O_1, O_i) + CoveringRadius of O_i | where O_i in P_1 }
+
                 */
+
+                var firstPromotedObjectCoveringRadius = localFirstPartition.MaxDistanceFromFirst(distanceMatrix);
+                var secondPromotedObjectCoveringRadius = localSecondPartition.MaxDistanceFromFirst(distanceMatrix);
                 var localMinMaxRadius = Math.Max(firstPromotedObjectCoveringRadius, secondPromotedObjectCoveringRadius);
-                if (!isLeafNode)
+                if (isInternalNode)
                 {
                     firstPromotedObjectCoveringRadius = this.CalculateCoveringRadius(
                         pair.Item1,
@@ -353,21 +319,123 @@ namespace Supercluster.MTree
 
         }
 
-        private double CalculateCoveringRadius(int promotedObjectIndex, IReadOnlyList<int> partitionIndexes, DistanceMatrix<T> distanceMatrix, IReadOnlyList<MNodeEntry<T>> entries)
+        private double CalculateCoveringRadius(
+            int promotedObjectIndex,
+            IReadOnlyList<int> partitionIndexes,
+            DistanceMatrix<T> distanceMatrix,
+            IReadOnlyList<MNodeEntry<T>> entries)
         {
             var maxRadius = double.MinValue;
 
             foreach (int index in partitionIndexes)
             {
-                var radius = distanceMatrix[index, promotedObjectIndex]
-                             + entries[index].CoveringRadius;
+                var radius = distanceMatrix[index, promotedObjectIndex] + entries[index].CoveringRadius;
                 maxRadius = Math.Max(radius, maxRadius);
             }
 
             return maxRadius;
         }
 
+        public void RangeSearch(MNode<T> node, T ballCenter, double ballRadius, List<T> results)
+        {
+            if (node == this.Root) // node is the root
+            {
+                foreach (var entry in node.Entries)
+                {
+                    this.RangeSearch(entry.ChildNode, ballCenter, ballRadius, results);
+                }
+            }
+            else
+            {
+                var distanceParentToCenter = this.Metric(node.ParentEntry.Value, ballCenter);
 
+                if (node.IsInternalNode)
+                {
+                    foreach (var entry in node.Entries)
+                    {
+
+                        var combinedRadius = entry.CoveringRadius + ballRadius;
+                        var test = Math.Abs(distanceParentToCenter - entry.DistanceFromParent);
+                        if (test <= combinedRadius)
+                        {
+                            var distanceCurrentToCenter = this.Metric(entry.Value, ballCenter);
+                            if (distanceCurrentToCenter <= combinedRadius)
+                            {
+                                this.RangeSearch(entry.ChildNode, ballCenter, ballRadius, results);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var entry in node.Entries)
+                    {
+                        var test = Math.Abs(distanceParentToCenter - entry.DistanceFromParent);
+                        if (test <= ballRadius)
+                        {
+                            var distanceCurrentToCenter = this.Metric(entry.Value, ballCenter);
+                            if (distanceCurrentToCenter <= ballRadius)
+                            {
+                                results.Add(entry.Value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public Tuple<List<int>, List<int>> BalancedPartition(
+            Tuple<int, int> pair,
+            List<int> pointsNotInPair,
+            DistanceMatrix<T> distanceMatrix)
+        {
+            var firstPartition = new List<int> { pair.Item1 };
+            var secondPartition = new List<int> { pair.Item2 };
+
+            int minIndex = -1;
+            int k = 0;
+            while (pointsNotInPair.Count > 0)
+            {
+                var dist = double.MaxValue;
+
+                if (k % 2 == 0)
+                {
+                    // Find which point is closest to the first promotion object
+                    for (int i = 0; i < pointsNotInPair.Count; i++)
+                    {
+                        if (distanceMatrix[pointsNotInPair[i], pair.Item1] < dist)
+                        {
+                            dist = distanceMatrix[pointsNotInPair[i], pair.Item1];
+                            minIndex = i;
+                        }
+                    }
+
+                    firstPartition.Add(pointsNotInPair[minIndex]);
+                }
+                else
+                {
+                    // Here we calculate the index of the pair in the unique distances array
+                    // this calculation depends on the unique distances array being reversed
+                    for (int i = 0; i < pointsNotInPair.Count; i++)
+                    {
+                        if (distanceMatrix[pointsNotInPair[i], pair.Item2] < dist)
+                        {
+                            dist = distanceMatrix[pointsNotInPair[i], pair.Item2];
+                            minIndex = i;
+                        }
+                    }
+
+                    secondPartition.Add(pointsNotInPair[minIndex]);
+                }
+
+                pointsNotInPair.RemoveAt(minIndex);
+                k++;
+            }
+
+
+            return new Tuple<List<int>, List<int>>(firstPartition, secondPartition);
+        }
     }
 }
+
 

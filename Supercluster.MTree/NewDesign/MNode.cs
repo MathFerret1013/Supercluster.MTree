@@ -9,7 +9,6 @@ namespace Supercluster.MTree.NewDesign
     public class MNode<TValue>
     {
 
-
         /// <summary>
         /// The node entry that is the parent of this node. THis property is null if this is the root node;
         /// </summary>
